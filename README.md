@@ -1,11 +1,14 @@
-import React, { useEffect, useContext } from "react";
+import React, { useEffect, useContext, useState } from "react";
 import { NavigationContext } from "../context/NavigationContext";
-import { Stack, Row, Col, Button, Image, Card } from "react-bootstrap";
-import { Link } from "react-router";
+import { Stack, Row, Col } from "react-bootstrap";
+import { IconUploader } from "../views/IconUploader";
 import "../styles/views/_metrics.scss";
 
 const Metrics: React.FC = () => {
   const { headerText, setHeaderText } = useContext(NavigationContext);
+
+  // ← New: hold the user-uploaded image URL
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const newHeaderText = "Operational Metrics Dashboard";
@@ -16,6 +19,13 @@ const Metrics: React.FC = () => {
 
   return (
     <Stack direction="vertical" className="metrics-container" gap={4}>
+      {/* ← New: place the uploader anywhere you like */}
+      <Row>
+        <Col>
+          <IconUploader onUpload={setUploadedImageUrl} />
+        </Col>
+      </Row>
+
       <Row>
         <div className="left-sidebar">
           <h2>Volume</h2>
@@ -759,9 +769,6 @@ const Metrics: React.FC = () => {
             </p>
           </Col>
 
-          <Link to="/" className="ms-auto">
-            <Button className="btn-secondary p1">Back</Button>
-          </Link>
         </Stack>
       </Row>
     </Stack>
