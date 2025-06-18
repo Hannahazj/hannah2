@@ -1,4 +1,4 @@
-metrics.tsx "import React, { useEffect, useContext } from "react";
+import React, { useEffect, useContext } from "react";
 import { NavigationContext } from "../context/NavigationContext";
 import { Stack, Row, Col, Button, Image, Card } from "react-bootstrap";
 import { Link } from "react-router";
@@ -724,26 +724,6 @@ const Metrics: React.FC = () => {
                 </Stack>
               </Col>
             </Stack>
-            <h2>Assumptions</h2>
-            <Col className="assumptions-container justify-content-center align-items-center">
-              <Stack direction="horizontal" gap={2}>
-                <Stack direction="vertical" gap={2}>
-                  <p className="p1">Average MR</p>
-                  <p className="p1">Per Enrollee</p>
-                  <h1>2.5</h1>
-                </Stack>
-                <Stack direction="vertical" gap={2}>
-                  <p className="p1">Average Enrollee </p>
-                  <p className="p1">Sample Per MAO</p>
-                  <h1>201</h1>
-                </Stack>
-                <Stack direction="vertical" gap={2}>
-                  <p className="p1">Average Overpayment</p>
-                  <p className="p1">Recovery Per MAO</p>
-                  <h1>800,000</h1>
-                </Stack>
-              </Stack>
-            </Col>
           </Stack>
         </Stack>
       </Row>
@@ -765,41 +745,4 @@ const Metrics: React.FC = () => {
   );
 };
 
-export default Metrics;" and metrics.scss "@use "../brand_theme";
-@use "../theme_variables";
-
-.metrics-container {
-  padding-left: 5% !important;
-  padding-right: 5% !important;
-  margin-bottom: 10%;
-}
-
-.left-sidebar {
-  //widths were being finnicky so I set to exact value
-  min-width: 40% !important;
-  max-width: 40% !important;
-}
-
-.chart-container {
-  border: 1px solid theme_variables.$platinum;
-  padding: 30px;
-}
-
-hr {
-  border: 2px solid theme_variables.$primary-blue-mid !important;
-}
-
-.insight-container {
-  border: 1px solid theme_variables.$platinum;
-  // justify-content: space-around;
-  height: 100%;
-  padding: 30px;
-}
-
-.assumptions-container {
-  border: 1px solid theme_variables.$platinum;
-  display: flex;
-  flex-direction: column !important;
-  padding: 30px;
-}
-"
+export default Metrics;
