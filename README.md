@@ -1,27 +1,25 @@
-given this information "Background: A brief description of the engagement and who is in the audience.
-Key Discussion Points:
-•	Discussion point # 1
-o	May bold important parts for emphasis.
-o	Spacing between bullets should be 3pt.
-o	Spacing between sections should be 6pt.
-•	Discussion point # 2
-•	Solid bullet
-o	Hollow bullet
-	Square bullet
-•	Discussion point # 3
-o	Maintain Arial 11pt or 12pt throughout the document.
-•	Page numbers should identify the page number including the total number of pages.
-o	When consolidating several topics, ensure the numbers correspond with the topic not the entire file (i.e., 1 of 3 not 1 of 20).
-•	Discussion point # 4
-o	The header should remain with the topic in blue with the Director or Vice Director and dates in black.
-•	Discussion point # 5
-o	The dates are civilian formatting month, day, year.
-o	Always use oxford comma rules.
-Closing Discussion Point:
-•	Final, “get off the stage” point.
-Topics to Avoid:
-•	Topic # 1 to avoid
-•	Topic # 2 to avoid
+given this information "MMMM DD, YYYY
+SUBJECT: Clearly and succinctly specify the issue the paper discusses. Use specific description that summarizes the content, avoiding vague, one-word subjects. Clarifying the subject can help in organizing and presenting the most relevant information clearly. Do not introduce acronyms in the subject line. (1-2 lines)
+PURPOSE: State what this information paper seeks to do (1 sentence)
+BACKGROUND: Clearly state germane background information on the issue. (3-4 sentences max)
+DISCUSSION / KEY POINTS:
+1.	Clearly and succinctly present information that the reader needs to know about the subject. Explain why it is important for the recipient to have this information.
+2.	Structure main points and supporting ideas in complete but succinct bulleted paragraphs. The bullets indicate divisions and relationships among concepts.
+A.	Use sub-bullets to illustrate significant supporting ideas that expand on the main bullet paragraph.
+3.	The organization of information should flow from the subject, audience, and purpose. Organize the information by presenting the most important information first unless information is necessary for the reader to understand the main point. Each bulleted paragraph should logically flow to the next.
+4.	Use short, concise sentences in an active voice. The tone should be neutral, clear, and direct in nature. Limit sentences to one thought. Use short, simple words. Avoid using acronyms, abbreviations, and jargon.
+RECOMMENDATION / WAY AHEAD: Clearly state recommendations and the way ahead.
+
+
+
+
+
+
+
+
+Prepared by: Full name, e-mail, and phone number of action officer
+Approved by: Full name of approving official (should be O-6/GS-15 or above for actions going to the DLA Director)
+
 " and this json "{
     "margins": {
         "top": 1,
