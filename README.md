@@ -1,6 +1,7 @@
 import json
 import networkx as nx
 import re
+import os
 from typing import Dict, List, Any
 
 
@@ -8,31 +9,21 @@ def clean_string(s: str) -> str:
     """Clean strings for Python code generation."""
     if not s:
         return ""
-    # Remove leading/trailing whitespace and special characters
+    # Remove special characters and extra spaces
     s = re.sub(r'[^a-zA-Z0-9_ ]', '', s.strip())
-    # Replace multiple spaces with single space
     return re.sub(r'\s+', ' ', s)
 
 
-def to_camel_case(text: str) -> str:
-    """Convert text to camelCase format for class names."""
+def to_snake_case(text: str) -> str:
+    """Convert text to snake_case for filenames and functions."""
     text = clean_string(text)
-    if not text:
-        return "Untitled"
-    words = text.split()
-    if not words:
-        return "Untitled"
-    return words[0].lower() + ''.join(word.capitalize() for word in words[1:])
+    return '_'.join(text.lower().split())
 
 
 def to_pascal_case(text: str) -> str:
-    """Convert text to PascalCase format for class names."""
+    """Convert text to PascalCase for class names."""
     text = clean_string(text)
-    if not text:
-        return "Untitled"
     words = text.split()
-    if not words:
-        return "Untitled"
     return ''.join(word.capitalize() for word in words)
 
 
@@ -60,6 +51,165 @@ def create_graph_from_json(json_data: Dict) -> nx.DiGraph:
     return G
 
 
+def generate_function_code(func_name: str, doc_str: str) -> str:
+    """Generate a single Python function definition."""
+    clean_name = to_snake_case(func_name) or "unnamed_function"
+    return (
+        f"def {clean_name}(mr) -> (bool, dict):\n"
+        f'    """{clean_string(doc_str) or clean_name}"""\n'
+        f'    print("{clean_name} called.")\n'
+        f"    return True, {{}}\n\n"
+    )
+
+
+def generate_board_files(board_name: str, functions: Dict, paths: List) -> Dict[str, str]:
+    """Generate all files for a single board."""
+    snake_name = to_snake_case(board_name)
+    pascal_name = to_pascal_case(board_name)
+    
+    # Generate board.py content
+    board_content = (
+        '"""\nDISCLAIMER:\nThis python file was created automatically.\n"""\n\n'
+        f"from radv.medical_record.validations.framework import Board\n"
+        f"from .functions import {', '.join([to_snake_case(f) for f in functions])}\n\n"
+        f"class {pascal_name}(Board):\n"
+        f"    functions = {{\n"
+    )
+    
+    # Add functions dictionary
+    func_entries = []
+    for func_name in functions:
+        clean_func = to_snake_case(func_name)
+        func_entries.append(f'        "{clean_string(func_name)}": {clean_func}')
+    
+    board_content += ",\n".join(func_entries) + "\n    }\n\n"
+    board_content += f"    paths = {json.dumps(paths, indent=8)}\n"
+    
+    # Generate functions.py content
+    functions_content = (
+        '"""\nDISCLAIMER:\nThis python file was created automatically.\n"""\n\n'
+    )
+    for func_name, doc_str in functions.items():
+        functions_content += generate_function_code(func_name, doc_str)
+    
+    # Generate __init__.py content
+    init_content = (
+        '"""\nPackage initialization.\n"""\n\n'
+        f"from .board import {pascal_name}\n"
+        f"__all__ = ['{pascal_name}']\n"
+    )
+    
+    return {
+        f"Board_{snake_name}/board.py": board_content,
+        f"Board_{snake_name}/functions.py": functions_content,
+        f"Board_{snake_name}/__init__.py": init_content
+    }
+
+
+def generate_workflow_code(flow_name: str, boards: List[str]) -> str:
+    """Generate workflow.py content."""
+    return (
+        '"""\nDISCLAIMER:\nThis python file was created automatically.\n"""\n\n'
+        "from radv.medical_record.validations.framework import Workflow\n"
+        + "\n".join([
+            f"from {flow_name}.Board_{to_snake_case(b)} import {to_pascal_case(b)}" 
+            for b in boards
+        ]) + "\n\n"
+        f"class {to_pascal_case(flow_name)}(Workflow):\n"
+        f"    boards = [{', '.join([to_pascal_case(b) for b in boards])}]\n"
+    )
+
+
+def generate_all_code(json_string: str, flow_name: str) -> Dict[str, str]:
+    """Generate all Python code files from graph JSON."""
+    try:
+        canvas_data = json.loads(json_string)
+        graph = create_graph_from_json(canvas_data)
+        paths_dict = get_paths(canvas_data, graph)
+        
+        generated_content = {}
+        boards = []
+
+        # Generate code for each board
+        for elem_id, elem_info in paths_dict.items():
+            if elem_info["type"] == "Board":
+                board_name = elem_info["label"] or "UntitledBoard"
+                board_files = generate_board_files(
+                    board_name,
+                    elem_info["functions"],
+                    elem_info["paths"]
+                )
+                generated_content.update(board_files)
+                boards.append(board_name)
+
+        # Generate workflow.py if we have boards
+        if boards:
+            generated_content["workflow.py"] = generate_workflow_code(flow_name, boards)
+            generated_content["__init__.py"] = '"""\nPackage initialization.\n"""\n'
+
+        return generated_content
+
+    except Exception as e:
+        return {"error": f"Code generation failed: {str(e)}"}
+
+
+def get_paths(canvas_data: Dict, graph: nx.DiGraph) -> Dict:
+    """Analyze paths through the graph."""
+    nodes = canvas_data.get("nodes", [])
+    elements = get_elements_from_canvas(nodes)
+    roots = {}
+    
+    # Identify root nodes
+    for node in nodes:
+        node_id = node.get("id")
+        if graph.in_degree(node_id) == 0:
+            closest_element = find_closest_node(node, elements)
+            if closest_element:
+                roots[node_id] = {
+                    "label": clean_string(closest_element.get("label", "")),
+                    "type": closest_element.get("elem_type", "Unknown"),
+                    "paths": [],
+                    "functions": {}
+                }
+            else:
+                roots[node_id] = {
+                    "label": clean_string(node.get("label", "")),
+                    "type": "Unknown",
+                    "paths": [],
+                    "functions": {}
+                }
+
+    # Analyze paths for each root
+    for root_id, root_info in roots.items():
+        leaf_nodes = [n for n in graph.nodes() if graph.out_degree(n) == 0]
+        
+        for leaf in leaf_nodes:
+            for path in nx.all_simple_paths(graph, source=root_id, target=leaf):
+                path_functions = []
+                triggers = []
+                
+                for i, node_id in enumerate(path):
+                    node_label = graph.nodes[node_id].get("label", "")
+                    clean_label = clean_string(node_label)
+                    path_functions.append(to_snake_case(clean_label))
+                    
+                    if i < len(path) - 1:
+                        edge_data = graph.get_edge_data(node_id, path[i+1])
+                        triggers.append(clean_string(edge_data.get("label", "")))
+
+                if path_functions:
+                    root_info["paths"].append({
+                        "trigger": dict(zip(path_functions, triggers)),
+                        "action": path_functions[-1]
+                    })
+                    
+                    for func in path_functions[:-1]:
+                        if func not in root_info["functions"]:
+                            root_info["functions"][func] = func.replace('_', ' ').title()
+
+    return roots
+
+
 def get_elements_from_canvas(nodes: List[Dict]) -> List[Dict]:
     """Identify special elements (boards, composite functions) from nodes."""
     elems = []
@@ -85,7 +235,7 @@ def find_closest_node(node: Dict, list_nodes: List[Dict]) -> Dict:
     
     for n in list_nodes:
         node_area = n.get("width", 0) * n.get("height", 0)
-        if (n.get("x", 0) < node.get("x", 0) and \
+        if (n.get("x", 0) < node.get("x", 0)) and \
            (n.get("x", 0) + n.get("width", 0) > node.get("x", 0)) and \
            (n.get("y", 0) < node.get("y", 0)) and \
            (n.get("y", 0) + n.get("height", 0) > node.get("y", 0)) and \
@@ -94,197 +244,3 @@ def find_closest_node(node: Dict, list_nodes: List[Dict]) -> Dict:
             min_area = node_area
     
     return closest_node
-
-
-def generate_function_code(func_name: str, doc_str: str) -> str:
-    """Generate a single Python function definition."""
-    clean_name = clean_string(func_name).replace(' ', '_')
-    if not clean_name:
-        clean_name = "unnamed_function"
-    
-    return (
-        f"def {clean_name}(mr) -> (bool, dict):\n"
-        f'    """{clean_string(doc_str) or clean_name}"""\n'
-        f'    print("{clean_name} called.")\n'
-        f"    return True, {{}}\n\n"
-    )
-
-
-def generate_board_code(board_name: str, functions: Dict, paths: List) -> str:
-    """Generate board.py content."""
-    class_name = to_pascal_case(board_name)
-    disclaimer = (
-        '"""\n'
-        "DISCLAIMER:\n"
-        "This python file was created automatically.\n"
-        '"""\n\n'
-    )
-    
-    # Generate imports
-    imports = (
-        "from radv.medical_record.validations.framework import Board\n"
-        f"from .functions import {', '.join([clean_string(f).replace(' ', '_') for f in functions])}\n\n"
-    )
-    
-    # Generate class definition
-    class_def = (
-        f"class {class_name}(Board):\n"
-        f"    functions = {{\n"
-    )
-    
-    # Add functions dictionary
-    func_entries = []
-    for func_name in functions:
-        clean_func = clean_string(func_name).replace(' ', '_')
-        func_entries.append(f'        "{clean_string(func_name)}": {clean_func}')
-    
-    class_def += ",\n".join(func_entries) + "\n    }\n\n"
-    
-    # Add paths
-    class_def += f"    paths = {json.dumps(paths, indent=8)}\n"
-    
-    return disclaimer + imports + class_def
-
-
-def generate_workflow_code(flow_name: str, boards: List[str]) -> str:
-    """Generate workflow.py content."""
-    class_name = to_pascal_case(flow_name)
-    disclaimer = (
-        '"""\n'
-        "DISCLAIMER:\n"
-        "This python file was created automatically.\n"
-        '"""\n\n'
-    )
-    
-    # Generate imports
-    imports = "from radv.medical_record.validations.framework import Workflow\n"
-    for board in boards:
-        clean_board = to_pascal_case(board)
-        imports += f"from {flow_name}.Board_{clean_board}.board import {clean_board}\n"
-    
-    # Generate class definition
-    class_def = (
-        f"\nclass {class_name}(Workflow):\n"
-        f"    boards = [{', '.join([to_pascal_case(b) for b in boards])}]\n"
-    )
-    
-    return disclaimer + imports + class_def
-
-
-def get_paths(canvas_data: Dict, graph: nx.DiGraph) -> Dict:
-    """Analyze paths through the graph."""
-    nodes = canvas_data.get("nodes", [])
-    elements = get_elements_from_canvas(nodes)
-    roots = {}
-    
-    # Identify root nodes
-    for node in nodes:
-        node_id = node.get("id")
-        if graph.in_degree(node_id) == 0:
-            closest_element = find_closest_node(node, elements)
-            if closest_element:
-                elem_type = closest_element.get("elem_type", "Unknown")
-                roots[node_id] = {
-                    "label": clean_string(closest_element.get("label", "")),
-                    "type": elem_type,
-                    "paths": [],
-                    "functions": {}
-                }
-            else:
-                roots[node_id] = {
-                    "label": clean_string(node.get("label", "")),
-                    "type": "Unknown",
-                    "paths": [],
-                    "functions": {}
-                }
-
-    # Analyze paths for each root
-    for root_id, root_info in roots.items():
-        leaf_nodes = [n for n in graph.nodes() if graph.out_degree(n) == 0]
-        functions = {}
-        paths = []
-
-        for leaf in leaf_nodes:
-            for path in nx.all_simple_paths(graph, source=root_id, target=leaf):
-                path_functions = []
-                triggers = []
-                
-                for i, node_id in enumerate(path):
-                    node_label = graph.nodes[node_id].get("label", "")
-                    clean_label = clean_string(node_label)
-                    path_functions.append(clean_label.replace(' ', '_'))
-                    
-                    if i < len(path) - 1:
-                        edge_data = graph.get_edge_data(node_id, path[i+1])
-                        triggers.append(clean_string(edge_data.get("label", "")))
-
-                # Record path information
-                if path_functions:
-                    paths.append({
-                        "trigger": dict(zip(path_functions, triggers)),
-                        "action": path_functions[-1]
-                    })
-                    
-                    # Build functions dictionary
-                    for func in path_functions[:-1]:
-                        if func not in functions:
-                            functions[func] = func.replace('_', ' ').title()
-
-        root_info["paths"] = paths
-        root_info["functions"] = functions
-
-    return roots
-
-
-def generate_all_code(json_string: str, flow_name: str) -> Dict[str, str]:
-    """Generate all Python code files from graph JSON."""
-    try:
-        canvas_data = json.loads(json_string)
-        graph = create_graph_from_json(canvas_data)
-        paths_dict = get_paths(canvas_data, graph)
-        
-        generated_content = {}
-        boards = []
-
-        # Generate code for each element
-        for elem_id, elem_info in paths_dict.items():
-            elem_type = elem_info["type"]
-            elem_label = elem_info["label"] or "Untitled"
-            functions = elem_info["functions"]
-            paths = elem_info["paths"]
-
-            # Generate functions.py content
-            func_content = (
-                '"""\n'
-                "DISCLAIMER:\n"
-                "This python file was created automatically.\n"
-                '"""\n\n'
-            )
-            for func_name, doc_str in functions.items():
-                func_content += generate_function_code(func_name, doc_str)
-
-            # Generate board or composite function content
-            if elem_type == "Board":
-                board_class = to_pascal_case(elem_label)
-                boards.append(board_class)
-                
-                # Generate board.py
-                board_content = generate_board_code(elem_label, functions, paths)
-                generated_content[f"Board_{board_class}/board.py"] = board_content
-                generated_content[f"Board_{board_class}/functions.py"] = func_content
-                
-            elif elem_type == "CompositeFunction":
-                comp_class = to_pascal_case(elem_label)
-                comp_content = generate_board_code(elem_label, functions, paths)
-                generated_content[f"CompositeFunction_{comp_class}/compositefunction.py"] = comp_content
-                generated_content[f"CompositeFunction_{comp_class}/functions.py"] = func_content
-
-        # Generate workflow.py
-        if boards:
-            workflow_content = generate_workflow_code(flow_name, boards)
-            generated_content["workflow.py"] = workflow_content
-
-        return generated_content
-
-    except Exception as e:
-        return {"error": f"Code generation failed: {str(e)}"}
