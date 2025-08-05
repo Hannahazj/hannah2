@@ -1,9 +1,7 @@
 import json
 import networkx as nx
 import re
-import os
 from typing import Dict, List, Any
-
 
 def split_question_label(label: str):
     """
@@ -23,19 +21,16 @@ def clean_string(s: str) -> str:
     s = re.sub(r'[^a-zA-Z0-9_ ]', '', s.strip())
     return re.sub(r'\s+', ' ', s)
 
-
 def to_snake_case(text: str) -> str:
     """Convert text to snake_case for filenames and functions."""
     text = clean_string(text)
     return '_'.join(text.lower().split())
-
 
 def to_pascal_case(text: str) -> str:
     """Convert text to PascalCase for class names."""
     text = clean_string(text)
     words = text.split()
     return ''.join(word.capitalize() for word in words)
-
 
 def create_graph_from_json(json_data: Dict) -> nx.DiGraph:
     """Create a directed graph from JSON data."""
@@ -60,7 +55,6 @@ def create_graph_from_json(json_data: Dict) -> nx.DiGraph:
 
     return G
 
-
 def generate_function_code(func_label: str) -> str:
     """
     Generate a single Python function definition.
@@ -80,34 +74,42 @@ def generate_board_files(board_name: str, functions: Dict, paths: List) -> Dict[
     """Generate all files for a single board."""
     snake_name = to_snake_case(board_name)
     pascal_name = to_pascal_case(board_name)
+
+    # Unique function names for import and dictionary
+    seen_names = set()
+    func_entries = []
+    import_funcs = []
+    for func_label in functions:
+        _, name_part = split_question_label(func_label)
+        clean_func = to_snake_case(name_part)
+        if clean_func not in seen_names:
+            func_entries.append(f'        "{name_part}": {clean_func}')
+            import_funcs.append(clean_func)
+            seen_names.add(clean_func)
     
     # Generate board.py content
     board_content = (
         '"""\nDISCLAIMER:\nThis python file was created automatically.\n"""\n\n'
         f"from ...framework import Board\n"
-        f"from .functions import {', '.join([to_snake_case(f) for f in functions])}\n\n"
+        f"from .functions import {', '.join(import_funcs)}\n\n"
         f"class {pascal_name}(Board):\n"
         f"    functions = {{\n"
+        + ",\n".join(func_entries) + "\n    }\n\n"
+        f"    paths = {json.dumps(paths, indent=8)}\n"
     )
-    
-    # Add functions dictionary
-    func_entries = []
-    for func_label in functions:
-        _, name_part = split_question_label(func_label)
-        clean_func = to_snake_case(name_part)
-        func_entries.append(f'        "{name_part}": {clean_func}')
 
-    
-    board_content += ",\n".join(func_entries) + "\n    }\n\n"
-    board_content += f"    paths = {json.dumps(paths, indent=8)}\n"
-    
-    # Generate functions.py content
+    # Generate functions.py content, only unique function names
     functions_content = (
         '"""\nDISCLAIMER:\nThis python file was created automatically.\n"""\n\n'
     )
+    seen_func_codes = set()
     for func_label in functions:
-        functions_content += generate_function_code(func_label)
-    
+        comment, name_part = split_question_label(func_label)
+        clean_func = to_snake_case(name_part)
+        if clean_func not in seen_func_codes:
+            functions_content += generate_function_code(func_label)
+            seen_func_codes.add(clean_func)
+
     # Generate __init__.py content
     init_content = (
         '"""\nPackage initialization.\n"""\n\n'
@@ -121,20 +123,18 @@ def generate_board_files(board_name: str, functions: Dict, paths: List) -> Dict[
         f"Board_{snake_name}/__init__.py": init_content
     }
 
-
 def generate_workflow_code(flow_name: str, boards: List[str]) -> str:
     """Generate workflow.py content."""
     return (
         '"""\nDISCLAIMER:\nThis python file was created automatically.\n"""\n\n'
         "from ..framework import Workflow\n"
         + "\n".join([
-            f"from {flow_name}.Board_{to_snake_case(b)} import {to_pascal_case(b)}" 
+            f"from {flow_name}.Board_{to_snake_case(b)} import {to_pascal_case(b)}"
             for b in boards
         ]) + "\n\n"
         f"class {to_pascal_case(flow_name)}(Workflow):\n"
         f"    boards = [{', '.join([to_pascal_case(b) for b in boards])}]\n"
     )
-
 
 def generate_all_code(json_string: str, flow_name: str) -> Dict[str, str]:
     """Generate all Python code files from graph JSON."""
@@ -167,7 +167,6 @@ def generate_all_code(json_string: str, flow_name: str) -> Dict[str, str]:
 
     except Exception as e:
         return {"error": f"Code generation failed: {str(e)}"}
-
 
 def get_paths(canvas_data: Dict, graph: nx.DiGraph) -> Dict:
     """Analyze paths through the graph."""
@@ -226,10 +225,10 @@ def get_paths(canvas_data: Dict, graph: nx.DiGraph) -> Dict:
                     
                     for func in path_functions[:-1]:
                         if func not in root_info["functions"]:
+                            # Store the *label* with question for comment, not just the function name
                             root_info["functions"][func] = func.replace('_', ' ').title()
 
     return roots
-
 
 def get_elements_from_canvas(nodes: List[Dict]) -> List[Dict]:
     """Identify special elements (boards, composite functions) from nodes."""
@@ -244,7 +243,6 @@ def get_elements_from_canvas(nodes: List[Dict]) -> List[Dict]:
                 node["elem_type"] = "CompositeFunction"
                 elems.append(node)
     return elems
-
 
 def find_closest_node(node: Dict, list_nodes: List[Dict]) -> Dict:
     """Find the closest containing group node."""
