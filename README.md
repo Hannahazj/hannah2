@@ -1,71 +1,4 @@
 {
-  "id": "tpl-info-paper",
-  "template_name": "Information Paper",
-  "description": "DLA information paper format.",
-  "sections": [
-    {
-      "id": "tpl-info-paper-header",
-      "section_name": "Header",
-      "template_id": "tpl-info-paper",
-      "section_description": "Date line and subject.",
-      "tone": "Neutral, clear, direct",
-      "structure": "Date, Subject",
-      "section_type": "text_block",
-      "content": "Information Paper\n{{date}}\n\nSUBJECT: Clearly and succinctly specify the issue the paper discusses. Avoid vague subjects. Do not introduce acronyms here. (1–2 lines)"
-    },
-    {
-      "id": "tpl-info-paper-purpose",
-      "section_name": "Purpose",
-      "template_id": "tpl-info-paper",
-      "section_description": "States what the paper seeks to do.",
-      "tone": "Neutral, clear, direct",
-      "structure": "One sentence",
-      "section_type": "text_block",
-      "content": "PURPOSE: State what this information paper seeks to do (1 sentence)."
-    },
-    {
-      "id": "tpl-info-paper-background",
-      "section_name": "Background",
-      "template_id": "tpl-info-paper",
-      "section_description": "Germane background information.",
-      "tone": "Neutral, clear, direct",
-      "structure": "3–4 sentences",
-      "section_type": "text_block",
-      "content": "BACKGROUND: Clearly state relevant background information on the issue. (3–4 sentences max)"
-    },
-    {
-      "id": "tpl-info-paper-discussion",
-      "section_name": "Discussion / Key Points",
-      "template_id": "tpl-info-paper",
-      "section_description": "Main points and supporting ideas.",
-      "tone": "Neutral, clear, direct",
-      "structure": "Bulleted, with sub-bullets",
-      "section_type": "text_block",
-      "content": "DISCUSSION / KEY POINTS:\n1. Present the most important information first and explain why it matters.\n2. Use concise bulleted paragraphs.\n   - Sub-bullets for significant supporting ideas.\n3. Ensure logical flow; each bullet should lead to the next.\n4. Use short, active-voice sentences; avoid jargon and acronyms."
-    },
-    {
-      "id": "tpl-info-paper-recommendation",
-      "section_name": "Recommendation / Way Ahead",
-      "template_id": "tpl-info-paper",
-      "section_description": "Clear recommendation and next steps.",
-      "tone": "Neutral, clear, direct",
-      "structure": "Short paragraph",
-      "section_type": "text_block",
-      "content": "RECOMMENDATION / WAY AHEAD: Clearly state recommendations and the way ahead."
-    },
-    {
-      "id": "tpl-info-paper-footer",
-      "section_name": "Signatures",
-      "template_id": "tpl-info-paper",
-      "section_description": "Prepared/Approved lines.",
-      "tone": "Neutral",
-      "structure": "Two lines",
-      "section_type": "text_block",
-      "content": "Prepared by: Full name, email, phone\nApproved by: Full name of approving official (O-6/GS-15 or above)"
-    }
-
-
-    {
   "id": "tpl-speaking-notes",
   "template_name": "Speaking Engagement Brief",
   "description": "Director/Vice Director speaking notes with formatted header and nested bullets.",
@@ -120,8 +53,5 @@
       "section_type": "text_block",
       "content": "Topics to Avoid:\n• Topic #1 to avoid\n• Topic #2 to avoid"
     }
-  ]
-}
-
   ]
 }
