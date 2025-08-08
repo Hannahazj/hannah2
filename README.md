@@ -1,4 +1,552 @@
-import { Component, ChangeDetectorRef, ViewChild, ElementRef, input } from '@angular/core';
+report-gen.component.html "
+
+
+
+
+<div class="modal-container" [ngClass]="{'new-section-documents-modal': createNewInstanceMode}" 
+    *ngIf="selectSourcesModal" [@bounceInUpOnEnter] [@bounceOutDownOnLeave]>
+    <div class="header-row">
+      <div class="modal-title" > 
+        Research Document Selection
+      </div>
+      
+      <fa-icon class="fa-icon" [icon]="faXmark" (click)="documentSelectionClosed($event)" ></fa-icon>
+  </div>
+    
+    
+  <div class="output-flex-row">
+
+    <report-documents-selection 
+        [incomingSelectedDocuments]="report?.sections[currentSection]?.content_array[currentInstancePosition]?.sources"
+        [createNewInstanceMode]="createNewInstanceMode"
+        (selectedDocumentsChange)="updateSelectedDocuments($event)" 
+        (closeModalEmit)="documentSelectionClosed($event)"
+        class="flex-col-2">
+    </report-documents-selection>
+  </div>
+</div>
+
+<div class="no-report" *ngIf="showNoReportSelected" [@fadeOutOnLeave]>
+    <app-items-page></app-items-page>
+
+</div>
+
+
+<div class="body-row" *ngIf="!showNoReportSelected" [@fadeOutOnLeave]>
+
+
+
+    <div class="primary-col"  >
+        <div class="top-row">
+            <div class="items-link" [routerLink]="['/write']" ><fa-icon class="fa-icon" [icon]="faFile"></fa-icon></div>
+            <!-- <div class="word-count">{{report?.sections[currentSection]?.content_array[currentInstance]?.content | wordCount}}<span> Words</span> ---- {{currentSection}} </div> -->
+            <div class="flex-column-spacer">
+                <div class="header-report-title" *ngIf="showHeaderReportTitle" [@fadeInOnEnter] [@fadeOutOnLeave]>{{report?.report_name}}</div>
+
+            </div>
+            
+            <button class="read-only-button" 
+                [ngClass]="{'read-only-mode-on': readOnlyMode, 'read-only-mode-off': !readOnlyMode}"
+                (click)="toggleReadOnlyMode()"> 
+                <span *ngIf="!readOnlyMode">Read Only</span>
+                <span *ngIf="readOnlyMode">Exit Read Only</span>
+            </button>
+            
+            <button class="download-button" [disabled]="!downloadReportAvailable" [ngClass]="{'disabled-download-button': !downloadReportAvailable}" (click)="downloadReport(report?.id, report?.report_name)"><!-- <fa-icon class="fa-icon" [icon]="faPrint"></fa-icon> --> Download Report</button>
+        </div>
+
+
+
+        <div class="primary-content-container" [ngClass]="{'read-only-primary-content-container': readOnlyMode}" #scrollContainer>
+            <div class="section-container-row">
+                <div class="controls-column" *ngIf="!readOnlyMode" ></div>
+                <div class="section-column">
+                    <div class="section-card" [ngClass]="{'section-card-edit': !readOnlyMode, 'section-card-read': readOnlyMode}" >
+                        <div class="section-title" id="report-title">
+                            <span *ngIf="!editReportTitle">{{report?.report_name}}  </span>
+                            <fa-icon *ngIf="!editReportTitle && !readOnlyMode"(click)="openEditReportTitle(); $event.stopPropagation()" class="fa-icon" [icon]="faPen"></fa-icon>
+                            <input (click)="$event.stopPropagation()" id="edit-report-title"  [(ngModel)]="tempReportTitle" class="edit-section-title-input" *ngIf="editReportTitle" type="text" placeholder="{{report?.report_name}}">
+                            <fa-icon *ngIf="editReportTitle" class="check-icon" [icon]="faCheck" (click)="changeReportTitle(); $event.stopPropagation()" ></fa-icon>
+                        
+                        </div>
+
+                        <div class="section-content-placeholder" *ngIf="report?.report_details?.report_description">{{report?.report_details?.report_description}}</div>
+                    </div>
+                </div>
+            </div>
+
+<!--             <div class="section-container">
+                <div class="controls-column"  *ngIf="!readOnlyMode" [@slideInLeftOnEnter]></div>
+                <div class="section-column">
+                    <div class="section-card" >
+                        <div class="section-title" id="report-subtitle">
+                            <span *ngIf="!editReportSubtitle && report?.report_subtitle">{{report?.report_subtitle}}</span>
+                            <span *ngIf="!editReportSubtitle && !report?.report_subtitle">Sub Title</span> 
+                            <fa-icon *ngIf="!editReportSubtitle" (click)="openEditReportSubtitle(); $event.stopPropagation()" class="fa-icon" [icon]="faPen"></fa-icon>
+                            <input (click)="$event.stopPropagation()"  [(ngModel)]="tempReportSubtitle" class="edit-section-title-input" *ngIf="editReportSubtitle" type="text" 
+                                placeholder="{{report?.report_subtitle}}">
+                            <fa-icon *ngIf="editReportSubtitle" class="check-icon" [icon]="faCheck" (click)="changeReportSubtitle(); $event.stopPropagation()" ></fa-icon>
+                        
+                        </div>
+                    </div>
+                </div>
+            </div> -->
+
+            <div class="section-container-row" *ngIf="report?.sections.length == 0">
+                <div class="controls-column"  *ngIf="!readOnlyMode"></div>
+                <div class="section-column">
+                    <div class="section-card" [ngClass]="{'section-card-edit': !readOnlyMode, 'section-card-read': readOnlyMode}" (click)="addNewSection()">
+                       <!--  <div class="section-title">
+                            <span >This report is blank, add a new section to get started  </span>
+
+                        </div> -->
+                        <span >This report is blank, add a new section to get started  </span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="section-container-row" *ngIf="report?.report_details?.created_from_template">
+                <div class="controls-column"  *ngIf="!readOnlyMode" ></div>
+                <div class="section-column">
+                    <div class="section-card-message" >
+                       <!--  <div class="section-title">
+                            <span >This report is blank, add a new section to get started  </span>
+
+                        </div> -->
+                        <span >This report was created from template: {{report?.report_details?.created_from_template}} </span>
+                    </div>
+                </div>
+
+            </div>
+
+
+            <div class="section-container" *ngFor="let section of report?.sections; let sectionIndex = index" [id]="'section-' + sectionIndex">
+
+<!--                 <div class="flex">
+                    <div class="add-section-row" *ngIf="sectionIndex === currentSection">
+
+                        <button class="minimal-button add-section  tooltip-parent" *ngIf="!readOnlyMode" (click)="addNewSection('above')">
+                            <fa-icon class="fa-icon" [icon]="faPlus"></fa-icon>
+                            Add section above
+                            <span class="tooltiptext">Add a new section above</span>
+                        </button>
+                    </div>
+                </div> -->
+
+                <div class="flex">
+                    <div class="controls-column"  *ngIf="!readOnlyMode" >
+
+                        <div class="section-details"  *ngIf="sectionIndex === currentSection" >
+                            <div class="section-title">
+                                <fa-icon class="fa-icon" [icon]="faFileLines"></fa-icon>
+                                    <ng-container *ngIf="createNewInstanceMode">Selected sources for generating response</ng-container> 
+                                    <ng-container *ngIf="!createNewInstanceMode">Sources used for generated response</ng-container> 
+                            </div>
+    
+    <!--                         <div *ngIf="section?.content_array?.length > 0 && section?.content_array[currentInstancePosition].sources?.length == 0" class="source" [@fadeInOnEnter] [@fadeOutOnLeave]>
+                                Utilizing all available sources  
+                            </div> -->
+    
+                            
+                            <ng-container *ngFor="let instance of section?.content_array">
+                                <ng-container *ngIf="instance.id === section?.selected_instance_id">
+
+                                    <div class="source" [@fadeInOnEnter] 
+                                        *ngFor="let source of instance?.sources">
+                                        <ng-container *ngIf="source?.title">{{source?.title}}</ng-container>
+                                        <ng-container *ngIf="source?.document_name">{{source?.document_name}}</ng-container>
+                                   
+                                    </div>
+                                </ng-container>
+                            </ng-container>
+    
+        
+    
+    
+                            <div class="position-bottom">
+                                <button class="select-source-button tooltip-parent" 
+                                    [ngClass]="{'select-source-button-new-instance': createNewInstanceMode}"
+                                    *ngIf="sectionIndex === currentSection" (click)="selectSourcesModal = true">
+                                   <!--  <fa-icon class="fa-icon" [icon]="faPlus"></fa-icon> -->
+                                    Select Specific Sources
+                                    <span class="tooltiptext">Add or remove sources for this section</span>
+                                </button>
+                            </div>
+                        </div>
+    
+    
+                    <!--  Future when we display multiple responses -->
+    
+                        <div class="section-previous-responses"  *ngIf="sectionIndex === currentSection" > 
+                            <div class="section-title" *ngIf="!createNewInstanceMode">
+                                <fa-icon class="fa-icon" [icon]="faCodeBranch"></fa-icon>
+                                Previous Responses
+                                <span>{{section?.content_array.length}} responses</span>
+                            </div>
+                            
+                            <ng-container *ngIf="!createNewInstanceMode">
+                                <ng-container *ngFor="let response of section?.content_array">
+                                    <div class="previous-response"  (click)="selectInstance(response?.id, true); $event.stopPropagation();" [@fadeInOnEnter] >
+                                        <fa-icon class="fa-icon" [icon]="faRegCircle" *ngIf="response?.id !== section?.selected_instance_id"></fa-icon>
+                                        <fa-icon class="fa-icon" [icon]="faCircle" *ngIf="response?.id === section?.selected_instance_id"></fa-icon>
+                                        {{response?.instance_description}}
+                                        <!-- <fa-icon *ngIf="response?.favorite" class="fa-icon favorite-fa-icon" [icon]="faHeart"></fa-icon> -->
+                                    </div>
+                                </ng-container>
+                            </ng-container>
+
+                            
+                            <button
+                                *ngIf="!createNewInstanceMode"
+                                class="create-new-response"
+                                tabindex="0"
+                                (click)="createNewResponse($event)"
+                                [attr.aria-label]="'Submit query to populate section'"
+                                >
+                                <fa-icon class="fa-icon" [icon]="faPlus"></fa-icon> Create a new version
+                            </button>
+    
+                        </div> 
+    
+    
+    
+                    </div>
+                    
+                    <div class="section-column">
+                        <div class="section-card"  (click)="selectSection(sectionIndex, $event)"  
+                            [ngClass]="{'selected-section-card': sectionIndex === currentSection, 
+                                        'section-card-new-edit': sectionIndex === currentSection && createNewInstanceMode && !readOnlyMode, 
+                                        'section-card-edit': !createNewInstanceMode && !readOnlyMode, 
+                                        'section-card-read': readOnlyMode}">
+    
+                            <!-- [@dataChange]="currentSection" [@slideInRightOnEnter] [@slideOutRightOnLeave] -->
+    
+                            <div class="section-title" *ngIf="sectionIndex !== currentSection"> 
+                                <span>{{section?.section_name}}  </span>
+                             </div>
+    
+                            <div class="section-title" *ngIf="sectionIndex === currentSection" >
+                                <span *ngIf="!editSectionTitle">{{section?.section_name}}  </span>
+                                <fa-icon *ngIf="!editSectionTitle" (click)="openEditSectionTitle(); $event.stopPropagation()" class="fa-icon" [icon]="faPen"></fa-icon>
+                                <input (click)="$event.stopPropagation()"  [(ngModel)]="tempSectionTitle" class="edit-section-title-input" *ngIf="editSectionTitle" type="text" placeholder="{{section?.section_name}}">
+                                <fa-icon *ngIf="editSectionTitle" class="check-icon" [icon]="faCheck" (click)="changeSectionTitle(); $event.stopPropagation()" ></fa-icon>
+                            
+                            </div>
+    
+                            <div class="section-content-placeholder" *ngIf="section?.section_settings?.section_description">{{section?.section_settings?.section_description}}</div>
+
+                            <div class="section-content-placeholder" *ngIf="sectionIndex !== currentSection && section?.section_settings?.section_type">Section Type: {{section?.section_settings?.section_type}}</div>
+                            <div class="section-content-placeholder" *ngIf="sectionIndex !== currentSection && section?.section_settings?.structure">Structure: {{section?.section_settings?.structure}}</div>
+                            <div class="section-content-placeholder" *ngIf="sectionIndex !== currentSection && section?.section_settings?.tone">Tone: {{section?.section_settings?.tone}}</div>
+
+
+    
+                            <div class="section-content-placeholder" *ngIf="!section?.section_settings?.section_description && !section?.content_array[section?.content_array?.length -1]?.content" >
+                                Describe what this section is about...
+                            </div>
+    
+                            <ng-container *ngFor="let instance of section?.content_array">
+                                <div class="section-content" 
+                                    *ngIf="instance.id === section?.selected_instance_id" 
+                                    [innerHTML]="instance?.content | markdown">
+    
+                                </div>
+                            </ng-container>
+    
+    
+                            
+    
+                            <div class="query-row" *ngIf="sectionIndex === currentSection">
+                                <form class="input-container" 
+                                    [ngClass]="{'new-response-container': createNewInstanceMode}" >
+
+                                    <div >
+                                            <span class="form-title" *ngIf="!createNewInstanceMode">Build upon this response for this section</span>
+                                            <span class="form-title" *ngIf="createNewInstanceMode">Create a new response for this section</span>
+
+                                    </div>
+
+                                    <textarea
+                                    type="text"
+                                    class="form-control"
+                                    placeholder="Describe what this section is about.."
+                                    id="query-input"
+    
+                                    (click)="$event.stopPropagation()"
+                                    (keyup.enter)="submitSectionQuery(report?.id, report?.sections[currentSection]?.id ,queryString, report?.sections[currentSection])"
+                                    autocomplete="off"
+                                    [(ngModel)]="queryString"
+                                    [ngModelOptions]="{standalone: true}"
+                                    tabindex="0"
+                                    [attr.aria-label]="'Text input query to populate section'"
+                                    ></textarea>
+
+                                    <form [formGroup]="sectionSettingsForm" (ngSubmit)="testForm()">
+
+
+                                        <div ngbDropdown  class="d-inline-block">
+                                            <span class="tooltip-parent">
+                                                Section type: 
+                                                <span class="tooltiptext">Describes the type of section being utilized</span>
+                                            </span>
+                                            <button type="button" class="btn btn-primary settings-dropdown" id="dropdownBasic2" ngbDropdownToggle      
+                                                [ngClass]="{
+                                                    'new-response-submit': createNewInstanceMode, 
+                                                    'query-submit-button': !createNewInstanceMode
+                                                }"
+                                                (ngModelChange)="updateSectionType(section, selectedSectionType)">{{selectedSectionType?.section_type | removeUnderscoreUppercase}}</button>
+                                            <div ngbDropdownMenu aria-labelledby="dropdownBasic2">
+                                              
+                                              <button ngbDropdownItem *ngFor="let item of sectionTypes" [value]="item" (click)="updateSectionType(section, item)">{{item?.section_type | removeUnderscoreUppercase}}</button>
+                                            </div>
+                                          </div>
+                                        <div class="form-row" *ngIf="section?.section_settings?.section_type">
+                                            <span class="type-item">
+                                               Description: 
+                                               {{section?.section_settings?.section_description}}
+                                           </span>
+                                       </div>
+
+                                       <div class="form-row" *ngIf="section?.section_settings?.tone">
+                                            <span class="type-item">
+                                            Tone: 
+                                            {{section?.section_settings?.tone}}
+                                            </span>
+                                        </div>
+
+                                        <div class="form-row" *ngIf="section?.section_settings?.structure">
+                                            <span class="type-item">
+                                            Structure: 
+                                            {{section?.section_settings?.structure}}
+                                            </span>
+                                        </div>
+<!--                                     <div class="form-row" *ngIf="section?.section_settings?.section_type">
+                                             <span class="tooltip-parent">
+                                                Section type: 
+                                                <span class="tooltiptext">Describes the type of section being utilized</span>
+                                            </span>
+                                            <input class="form-input" 
+                                                type="text" 
+                                                formControlName="type"
+                                                placeholder="{{section?.section_settings?.section_type}}" 
+                                                (click)="$event.stopPropagation()">
+                                        </div>
+                                        <div class="form-row" *ngIf="section?.section_settings?.section_type">
+                                            <span class="tooltip-parent">
+                                                Structure: 
+                                                <span class="tooltiptext">Describes the structure desired in the response</span>
+                                            </span>
+                                            <input class="form-input" 
+                                                type="text" 
+                                                formControlName="structure"
+                                                placeholder="{{section?.section_settings?.structure}}" 
+                                                (click)="$event.stopPropagation()">
+                                        </div>
+                                        <div class="form-row" *ngIf="section?.section_settings?.tone">
+                                            <span class="tooltip-parent">
+                                                Tone: 
+                                                <span class="tooltiptext">Describes the tone desired in the response</span>
+                                            </span>
+                                            <input class="form-input" 
+                                                type="text" 
+                                                formControlName="tone"
+                                                placeholder="{{section?.section_settings?.tone}}" 
+                                                (click)="$event.stopPropagation()">
+                                        </div> -->
+                                    </form>
+                                    
+                                    <div class="form-row align-self-end">
+                                        <button
+                                            type="submit"
+                                            class="base-submit-button"
+                                            [ngClass]="{
+                                                'new-response-submit': createNewInstanceMode, 
+                                                'query-submit-button': !createNewInstanceMode
+                                            }"
+
+                                            tabindex="0"
+                                            (click)="submitSectionQuery(report?.id, report?.sections[currentSection]?.id ,queryString, report?.sections[currentSection] ); $event.stopPropagation()"
+                                            [attr.aria-label]="'Submit query to populate section'"
+                                            >
+                                            
+
+                                            <span *ngIf="createNewInstanceMode">Submit for new response</span>
+                                            <span *ngIf="!createNewInstanceMode">Submit to modify response</span>
+                                        </button>
+
+                                    </div>
+
+                                </form>
+                            </div> 
+    
+    
+    
+                            <div class="section-controls-row" *ngIf="sectionIndex === currentSection">
+    
+    
+                                <ng-container *ngIf="!section?.locked">
+    <!--                                 <button class="control-button tooltip-parent" (click)="toggleLocked()">
+                                        <fa-icon class="fa-icon" [icon]="faUnlock"></fa-icon>
+                                        <span class="tooltiptext">Lock this section</span>
+                                    </button> -->
+    
+                                    <button class="control-button tooltip-parent" (click)="copyToClipboard(standardTpl)">
+                                        <fa-icon class="fa-icon" [icon]="faClone"></fa-icon>
+                                        <span class="tooltiptext">Copy to clipboard</span>
+                                    </button>
+    
+    <!--                                 <button class="control-button tooltip-parent" (click)="toggleFavorite()" *ngIf="section?.content_array[currentInstance]?.favorite">
+                                        <fa-icon class="fa-icon" [icon]="faHeart"></fa-icon>
+                                        <span class="tooltiptext">Unfavorite instance</span>
+                                    </button>
+    
+                                    <button class="control-button tooltip-parent" 
+                                        (click)="toggleFavorite()" 
+                                        *ngIf="!section?.content_array[currentInstance]?.favorite">
+                                        <fa-icon class="fa-icon" [icon]="faHeartRegular"></fa-icon>
+                                        <span class="tooltiptext">Favorite instance</span>
+                                    </button> -->
+                                    
+                                    <button class="control-button no-border-right tooltip-parent"
+                                        [ngClass]="{'disabled': currentSection == 0}"
+                                        [disabled]="currentSection === 0"
+                                        (click)="moveSectionUp()">
+                                        <fa-icon class="fa-icon" [icon]="faArrowUp"></fa-icon>
+                                        <span class="tooltiptext">Move section up in report</span>
+                                    </button>
+                                    <button class="control-button tooltip-parent"
+                                        (click)="moveSectionDown()"
+                                        [ngClass]="{'disabled': currentSection === report?.sections.length -1}"
+                                        [disabled]="currentSection === report?.sections.length -1"
+                                        >
+                                        <fa-icon class="fa-icon" [icon]="faArrowDown"></fa-icon>
+                                        <span class="tooltiptext">Move section down in report</span>
+                                    </button>
+                                    <button class="control-button tooltip-parent"
+                                        (click)="deleteSection(report?.id, report?.sections[currentSection]?.id )">
+                                        <fa-icon class="fa-icon" [icon]="faTrashCan"></fa-icon>
+                                        <span class="tooltiptext">Delete section</span>
+                                    </button>
+                                </ng-container>
+    
+                                <ng-container *ngIf="section?.locked">
+                                    <button class="tooltip-parent control-button locked-button " (click)="toggleLocked()">
+                                        <fa-icon class="fa-icon" [icon]="faLock" ></fa-icon>
+                                        <span class="tooltiptext">Unlock this section</span>
+                                    </button>
+                                        
+                                </ng-container>
+    
+                            </div>
+    
+    
+                        </div>
+    
+    
+    
+               <!--          <button class="minimal-button add-section  tooltip-parent" (click)="addNewSection('below')">
+                            <fa-icon class="fa-icon" [icon]="faPlus"></fa-icon>
+                        Add a new section
+                        <span class="tooltiptext">Add addtional section</span>
+                        </button> -->
+                    </div>
+                </div>
+
+<!-- 
+                <div class="flex">
+                    <div class="add-section-row" *ngIf="sectionIndex === currentSection">
+
+                        <button class="minimal-button add-section  tooltip-parent" *ngIf="!readOnlyMode" (click)="addNewSection('below')">
+                            <fa-icon class="fa-icon" [icon]="faPlus"></fa-icon>
+                            Add section below
+                            <span class="tooltiptext">Add a new section below</span>
+                        </button>
+                    </div>
+                </div> -->
+
+
+
+            </div>
+
+            <div class="flex">
+                <div class="add-section-row">
+
+                    <button class="minimal-button add-section  tooltip-parent" *ngIf="!readOnlyMode" (click)="addNewSection('below')">
+                        <fa-icon class="fa-icon" [icon]="faPlus"></fa-icon>
+                        Add section below
+                        <span class="tooltiptext">Add a new section below</span>
+                    </button>
+                </div>
+            </div> 
+
+<!--             <div class="flex-row-justify-end" >
+                <button class="minimal-button add-section  tooltip-parent" *ngIf="!readOnlyMode" (click)="addNewSection()">
+                    <fa-icon class="fa-icon" [icon]="faPlus"></fa-icon>
+                    Add a new section
+                    <span class="tooltiptext">Add addtional section</span>
+                </button>
+            </div> -->
+
+        </div>
+    </div>
+
+    <div class="right-col">
+
+        <div class="report-title">
+            <img class="edit-icon" alt="edit title icon" src="../../assets/icons/edit.svg">
+        </div>
+
+<!--         <div class="report-title">
+            <img class="edit-icon" alt="edit title icon" src="../../assets/icons/edit.svg">
+        </div> -->
+
+        <div class="section-tile" 
+        *ngFor="let section of report?.sections; let i = index" 
+        [id]="'nav-section-' + i"
+        [ngClass]="{'selected-tile': currentSection === i &&  !createNewInstanceMode, 'selected-tile-empty': currentSection === i &&  createNewInstanceMode, }"
+        (click)="selectSection(i, $event)">
+
+            <div class="empty-title-and-content line-diagonal" *ngIf="section?.section_name == 'Section' && section?.content_array?.length == 0">
+                <img class="edit-icon" alt="edit title icon" src="../../assets/icons/edit.svg">
+                <fa-icon class="fa-icon doc-icon" [icon]="faFileLines"></fa-icon>
+            </div>
+
+            <div class="empty-title" *ngIf="section?.section_name == 'Section' && section?.content_array?.length > 0">
+                <img class="edit-icon" alt="edit title icon" src="../../assets/icons/edit.svg">
+            </div>
+
+            <div class="empty-content" *ngIf="section?.section_name !== 'Section' && section?.content_array?.length == 0">
+                <fa-icon class="fa-icon doc-icon" [icon]="faFileLines"></fa-icon>
+            </div>
+
+            <div class="line-container " *ngIf="section?.section_name !== 'Section' && section?.content_array[0]?.content?.length > 0">
+                <div class="half-line"></div>
+                <div class="full-line"></div>
+                <div class="full-line"></div>
+                <div class="full-line"></div>
+                <div class="half-line"></div>
+
+                <ng-content *ngIf="section?.content_array[0]?.content?.length > 700">
+                    <div class="empty-line"></div>
+
+                    <div class="half-line"></div>
+                    <div class="full-line"></div>
+                    <div class="full-line"></div>
+                    <div class="full-line"></div>
+                    <div class="half-line"></div>
+                </ng-content>
+
+            </div>
+
+    </div>
+       
+    </div>
+</div>
+
+
+
+<ng-template #standardTpl></ng-template>"  and report-gen.component.ts "import { Component, ChangeDetectorRef, ViewChild, ElementRef, input } from '@angular/core';
 import { BaseComponent } from '../base/base.component';
 import { 
   FormsModule, 
@@ -128,7 +676,7 @@ export class ReportGenComponent extends BaseComponent{
   /**
    * Report Id
    */
-  reportId: any = null;
+  reportId = null;
 
   /**
    * Flag to toggle the select sources modal
@@ -216,14 +764,6 @@ export class ReportGenComponent extends BaseComponent{
    * Watching the scroll container
    */
   @ViewChild('scrollContainer') scrollableElement!: ElementRef;
-
-  // -------------------- speaking_notes only state --------------------
-  speakingNotesApplied = false;       // prevents duplicate insertion
-  speakingModeActive = false;         // gates the header editor UI
-  headerRole = 'Director';            // Director | Vice Director
-  headerTopic = '';                   // topic text
-  headerDate: string | null = null;   // yyyy-mm-dd (from input[type=date]) or null for today
-  // -------------------------------------------------------------------
 
   /**
    * Constructor
@@ -492,34 +1032,11 @@ export class ReportGenComponent extends BaseComponent{
   }
 
   updateSectionType(section, type){
-    console.log('updateSectionType: selected', type);
+    console.log(section, type);
 
     this.selectedSectionType = type;
     section.section_settings = type;
 
-    // robust normalization to catch speaking_notes casing/format variants
-    const label = (type?.section_type || type?.template_name || '').toString().trim().toLowerCase();
-    const isSpeaking =
-      label === 'speaking_notes' ||
-      label === 'speaking-notes' ||
-      label === 'speaking notes' ||
-      /speaking[_\-\s]?notes/.test(label);
-
-    const isInfoPaper =
-      label === 'information_paper' ||
-      label === 'information-paper' ||
-      label === 'information paper' ||
-      /information[_\-\s]?paper/.test(label);
-
-    this.speakingModeActive = isSpeaking;
-
-    if (isSpeaking) {
-      console.log('[speaking_notes] detected; applying template once…');
-      this.applySpeakingNotesTemplateOnce();
-    }
-    if (isInfoPaper) {
-      // reserved for later wiring
-    }
   }
 
 
@@ -538,10 +1055,37 @@ export class ReportGenComponent extends BaseComponent{
       // Update report object
       this.report = result.db_report;
 
+      // Need to select section 
+/*       const newSectionId = result.section_id;
+
+      let newSectionIndex = this.report.sections.findIndex(obj => obj.id === newSectionId)
+
+      // Need to move item in the array
+      console.log(newSectionIndex);
+
+      let destinationIndex;
+
+      if (aboveORbelow == 'above' ) {
+        destinationIndex = 0;
+        if (this.currentSection > 0){
+          destinationIndex = this.currentSection; 
+        }
+      }  else {
+        destinationIndex = this.currentSection ; 
+      }
+      
+      this.moveElementInArray(this.report.sections, newSectionIndex, destinationIndex);
+
+      newSectionIndex = this.report.sections.findIndex(obj => obj.id === newSectionId)
+
+      // Select new section and set focus
+      this.selectSection(newSectionIndex, null); */
+
       // Allow download
       this.downloadReportAvailable = true; 
 
-      // (optionally) select the new section here
+      // Update report 
+      //this.sendUpdateReport(this.report);
     })
   }
 
@@ -579,12 +1123,32 @@ export class ReportGenComponent extends BaseComponent{
 
       let newSectionIndex = this.report.sections.findIndex(obj => obj.id === newSectionId)
 
+      // Need to move item in the array
+      console.log(newSectionIndex);
+
+/*       let destinationIndex;
+
+      if (aboveORbelow == 'above' ) {
+        destinationIndex = 0;
+        if (this.currentSection > 0){
+          destinationIndex = this.currentSection; 
+        }
+      }  else {
+        destinationIndex = this.currentSection + 1; 
+      } */
+      
+     // this.moveElementInArray(this.report.sections, newSectionIndex, destinationIndex);
+
+      //newSectionIndex = this.report.sections.findIndex(obj => obj.id === newSectionId)
+
       // Select new section and set focus
       this.selectSection(newSectionIndex, null);
 
       // Allow download
       this.downloadReportAvailable = true; 
 
+      // Update report 
+      //this.sendUpdateReport(this.report);
     })
   }
 
@@ -595,7 +1159,12 @@ export class ReportGenComponent extends BaseComponent{
       return arr; // Return original array if indices are invalid
     }
   
+    // 1. Remove the element from its old position
+    // splice(startIndex, deleteCount) returns an array containing the removed elements
     const [elementToMove] = arr.splice(old_index, 1); 
+  
+    // 2. Insert the element at the new position
+    // splice(startIndex, deleteCount, item1, item2, ...) inserts items without deleting
     arr.splice(new_index, 0, elementToMove); 
   
     return arr;
@@ -626,6 +1195,16 @@ export class ReportGenComponent extends BaseComponent{
   }
 
 
+/*   keySubmitSelection(reportId, sectionId, query, sectionObject, $event){
+    console.log("SUBMIT", $event, $event.key)
+    if ($event && $event.key == "Enter"){
+      $event.preventDefault();
+      this.submitSectionQuery(reportId, sectionId, query, sectionObject);
+
+    }
+  } */
+
+
   createNewResponse(event){
     console.log('new response')
     // Enter create new instance mode
@@ -634,6 +1213,8 @@ export class ReportGenComponent extends BaseComponent{
     this.currentInstancePosition = null;
 
     this.updateSelectedDocuments(event);
+
+    //this.updateInstancePosition(null);
 
     this.cdr.detectChanges();
 
@@ -749,16 +1330,23 @@ export class ReportGenComponent extends BaseComponent{
       }
 
       // Set section type
+
       const sectionObject = this.getSectionTypeByType(this.report.sections[index].section_settings.section_type);
       if (sectionObject) { 
         this.report.sections[index].section_settings = sectionObject;
         this.selectedSectionType = sectionObject;
       }
 
+      
+
+
       this.selectInstance(this.report.sections[index].selected_instance_id, false);
       this.scrollToPosition(index);
       this.setFocusOnInput();
+   // }, 0)
 
+    
+    
   }
 
   /**
@@ -804,13 +1392,15 @@ export class ReportGenComponent extends BaseComponent{
    * Toggle favorite for the current section
    */
   toggleFavorite(){
-    // no-op
+    //this.report.sections[this.currentSection].favorite = !this.report.sections[this.currentSection].favorite;
+    //this.report.sections[this.currentSection].content_array[this.currentInstance].favorite = !this.report.sections[this.currentSection].content_array[this.currentInstance].favorite 
   }
 
   /**
    * Move section down one position
    */
   moveSectionDown(){
+
 
     const temp = this.report.sections[this.currentSection];
     this.report.sections[this.currentSection] = this.report.sections[this.currentSection + 1];
@@ -828,4 +1418,183 @@ export class ReportGenComponent extends BaseComponent{
 
     const temp = this.report.sections[this.currentSection -1];
 
-    this.report.sections[this.currentSection- 1]
+    this.report.sections[this.currentSection- 1] = this.report.sections[this.currentSection];
+
+    this.report.sections[this.currentSection] = temp;
+
+    // move the current selected
+    this.currentSection--;
+
+    this.sendUpdateReport(this.report);
+  }
+
+  /**
+   * Delete a section
+   * @param reportId 
+   * @param sectionId 
+   */
+  deleteSection(reportId, sectionId){
+
+    // Prevent download
+    this.downloadReportAvailable = false; 
+    this.reportsService.deleteSection(reportId, sectionId).subscribe({
+
+      next: (result) => {
+
+        this.report.sections.splice(this.currentSection, 1);
+
+        //check for last item
+        if (this.currentSection > this.report.sections.length - 1){
+          this.currentSection--;
+        }
+
+        // Allow download
+        this.downloadReportAvailable = true; 
+      }
+    })
+  }
+
+  /**
+   * submit update report
+   * @param report 
+   */
+  sendUpdateReport(report){
+
+    // Prevent download
+    this.downloadReportAvailable = false; 
+
+    this.reportsService.updateReport(report.id, report).subscribe({
+      next: (result) => {
+
+        // Allow download
+        this.downloadReportAvailable = true; 
+      }
+    })
+  }
+
+  /**
+   * Update selected documents for a section
+   * MAY NEED MORE WORK HERE
+   * @param event 
+   */
+  updateSelectedDocuments(event){
+
+    // Find if temp instance exists
+    console.log(this.report.sections[this.currentSection].content_array.findIndex(obj => obj.id === 'temp-instance-id'));
+
+    console.log(this.report.sections[this.currentSection]);
+
+    if (this.report.sections[this.currentSection].content_array.findIndex(obj => obj.id === 'temp-instance-id') == -1){
+      this.report.sections[this.currentSection].content_array.push(
+        {
+          id: 'temp-instance-id',
+          instance_description: '',
+          content: 'Describe what this section is about...',
+          favorite: false,
+          sources: event
+        }
+      )
+
+      this.currentInstancePosition = 0;
+    }
+
+    console.log(this.report.sections[this.currentSection].content_array)
+    
+    this.report.sections[this.currentSection].selected_instance_id = 'temp-instance-id';
+
+    //this.selectInstance('temp-instance-id');
+
+    console.log(this.report.sections[this.currentSection].content_array[this.report.sections[this.currentSection].content_array.length -1].sources)
+
+    //this.report.sections[this.currentSection].content_array[this.report.sections[this.currentSection].content_array.length -1].sources = event;
+
+    this.cdr.detectChanges();
+
+  }
+
+  /**
+   * Select instance of 
+   * @param instanceId 
+   * @param updateSection 
+   */
+  selectInstance(instanceId, updateSection = false){
+
+      // Exit create new instance mode
+      
+      if (this.report.sections[this.currentSection].content_array.length == 0){
+        this.createNewInstanceMode = true; 
+      } else {
+        this.createNewInstanceMode = false; 
+      }
+
+      this.report.sections[this.currentSection].selected_instance_id = instanceId;
+
+      this.updateInstancePosition(instanceId);
+
+      // Need to set the current source list somewhere so I can pass to the modal
+
+      // TURN SAVE BACK ON WHEN SERVICE ISSUE IS FIXED
+      if (updateSection){
+        this.updateSection(this.report.id, this.report.sections[this.currentSection].id, this.report.sections[this.currentSection]);
+      }
+     
+
+  }
+
+
+  /**
+   * update instance position
+   * which instance is active for a section
+   * @param instanceId 
+   */
+  updateInstancePosition(instanceId){
+
+    let index = this.report.sections[this.currentSection].content_array.findIndex(obj => obj.id === instanceId)
+    
+    this.sectionSettingsForm.reset();
+
+    console.log(index);
+    console.log(this.report.sections[index]);
+
+    let section_settings = null;
+
+    if (this.report.sections[index] && this.report.sections[index].section_settings){
+      section_settings = this.report.sections[index].section_settings
+
+      this.sectionSettingsForm.setValue({
+        type: section_settings.section_type,
+        structure: section_settings.structure,
+        tone: section_settings.tone
+      })
+    }
+
+    this.currentInstancePosition = index;
+
+    // need case for not found
+  
+  }
+
+
+  /**
+   * Used to store current section value while in read only mode
+   */
+  temporaryCurrentSection = null;
+
+
+  toggleReadOnlyMode(){
+    this.readOnlyMode = !this.readOnlyMode;
+
+    if (this.readOnlyMode){
+      this.temporaryCurrentSection = this.currentSection;
+      this.currentSection = null;
+    } else {
+      this.currentSection = this.temporaryCurrentSection;
+      this.temporaryCurrentSection = null;
+    }
+  }
+
+
+
+  
+}
+"
