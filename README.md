@@ -638,3 +638,194 @@ export class ReportGenComponent extends BaseComponent{
     this.cdr.detectChanges();
 
   }
+
+  /**
+   * Used to submit a new query for a section
+   * @param reportId 
+   * @param sectionId 
+   * @param query 
+   * @param sectionObject 
+   */
+  submitSectionQuery(reportId, sectionId, query, sectionObject){
+
+    // Prevent Download 
+    this.downloadReportAvailable = false; 
+
+    this.reportsService.createInstance(reportId, sectionId, query, sectionObject).subscribe({
+
+      next: (result) => {
+
+        // Remove temp instance if found
+        let tempInstanceIndex = this.report.sections[this.currentSection].content_array.findIndex(obj => obj.id === 'temp-instance-id');
+        if (tempInstanceIndex !== -1){
+          this.report.sections[this.currentSection].content_array.splice(tempInstanceIndex, 1);
+
+        }
+
+        let sectionIndexToUpdate =  this.report.sections.findIndex((obj) => obj.id === sectionId);
+
+        this.report.sections[sectionIndexToUpdate].content_array.push(result);
+
+        // Activate new instance
+        this.report.sections[this.currentSection].selected_instance_id = result.id;
+
+        // Allow download 
+        this.downloadReportAvailable = true; 
+
+        // Force page update
+        this.cdr.detectChanges();
+
+      } 
+    })
+  }
+
+
+  /**
+ * Used to set user focus on the input box
+ * Need to use different classes for research and non-research view
+ */
+  setFocusOnInput() {
+  
+    setTimeout(() => {
+      let inputSelector = 'query-input';
+
+      let inputEle = document.getElementById(inputSelector);
+      console.log(inputEle);
+      if (inputEle instanceof HTMLElement) { inputEle.focus()}
+    }, 50)
+
+  }
+
+  getSectionTypeByType(section_type){
+    console.log(section_type);
+
+    section_type == 'text_block' ? section_type = 'free_text' : section_type = section_type;
+    console.log(this.sectionTypes);
+    const fullSection = this.sectionTypes.find(type => {
+      return type.section_type == section_type;
+    })
+
+    return fullSection;
+  }
+
+
+  /**
+   * Change selected section
+   * @param index 
+   */
+  selectSection(index, event){
+
+    if (this.readOnlyMode) {
+      return;
+    }
+
+    console.log(this.report.sections[index]);
+
+    // Early exit if needed
+    if (this.report.sections.length < index){
+      return;
+    }
+
+    // Close section title edit
+    this.editSectionTitle = false;
+    this.tempSectionTitle = '';
+
+    // Clear query box
+    this.queryString = '';
+
+    console.log(event);
+
+    // Clear first for annimation purposes
+    this.currentSection = null;
+
+    //setTimeout(() => {
+      this.currentSection = index;
+
+      // Determine if there are no current instances for the section
+      console.log(this.report.sections[index].content_array.length)
+      if (this.report.sections[index].content_array.length == 0){
+        console.log('should be new instance mode')
+        this.createNewInstanceMode = true; 
+      }
+
+      // Set section type
+      const sectionObject = this.getSectionTypeByType(this.report.sections[index].section_settings.section_type);
+      if (sectionObject) { 
+        this.report.sections[index].section_settings = sectionObject;
+        this.selectedSectionType = sectionObject;
+      }
+
+      this.selectInstance(this.report.sections[index].selected_instance_id, false);
+      this.scrollToPosition(index);
+      this.setFocusOnInput();
+
+  }
+
+  /**
+   * Scroll section into view
+   * @param index 
+   */
+  scrollToPosition(index: number) {
+    const element = document.getElementById('section-' + index);
+
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      const navElement = document.getElementById('nav-section-' + index);
+      navElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
+
+  /**
+   * Toggle Locked for the current section
+   */
+  toggleLocked(){
+    this.report.sections[this.currentSection].locked = !this.report.sections[this.currentSection].locked;
+
+    this.updateSection(this.reportId, this.report.sections[this.currentSection].id, {}  );
+  }
+
+  /**
+   * Copy section response to clipboard
+   * @param template 
+   */
+  copyToClipboard(template){
+
+    navigator.clipboard.writeText(this.report.sections[this.currentSection].content_array[0].content);
+    this.toastService.show({
+      value: "Copied to clipboard",
+      template,
+      classname: "bg-success text-light",
+    });
+  }
+  
+  /**
+   * Toggle favorite for the current section
+   */
+  toggleFavorite(){
+    // no-op
+  }
+
+  /**
+   * Move section down one position
+   */
+  moveSectionDown(){
+
+    const temp = this.report.sections[this.currentSection];
+    this.report.sections[this.currentSection] = this.report.sections[this.currentSection + 1];
+    this.report.sections[this.currentSection + 1] = temp;
+
+    // move the current selected
+    this.currentSection++;
+    this.sendUpdateReport(this.report);
+  }
+
+  /**
+   * Move section up one position
+   */
+  moveSectionUp(){
+
+    const temp = this.report.sections[this.currentSection -1];
+
+    this.report.sections[this.currentSection- 1]
