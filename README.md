@@ -373,3 +373,260 @@ export class TableComponent extends BaseComponent {
     
 
 }"
+
+table.component.scss "
+@import "../../assets/styles/designsystem.scss";
+
+
+.form-group {
+    margin: 0px 0px 20px;
+    width: 300px;
+    align-self: flex-end;
+}
+
+.viewport {
+    height: calc(100vh - 250px);
+    width: 100%;
+
+}
+.table {
+    //border-collapse: separate !important;
+    
+
+    thead {
+        
+        tr {
+            
+
+            th {
+                background-color: $color-gray-2;
+                color: $color-gray-8;
+                font-weight: $font-weight-5;
+                padding-left: 15px;
+                cursor: pointer;
+                
+            }
+
+            th:hover {
+               color: $color-gray-8; 
+            }
+
+            .selectedColumn {
+                color: $black !important;
+            }
+    
+            th:first-of-type {
+                border-top-left-radius: $border-radius-2;
+                min-width: 350px;
+                max-width: 500px;
+                
+            }
+
+            th:not(first-of-type) {
+                text-align: center;
+                table-layout: fixed;
+            }
+
+            th:last-of-type {
+                border-top-right-radius: $border-radius-2;
+                //border-right: 1px solid $color-gray-5;
+                //border-top: 1px solid $color-gray-5;
+            }
+        }
+
+
+
+    }
+
+    tbody {
+
+
+
+        tr:nth-child(even) th {
+            background-color: #F4F7FC;
+        }
+        
+        tr {
+            th:first-of-type {
+                border-left: 1px solid $color-gray-5;
+                width: 8em;
+                min-width: 8em;
+                max-width: 8em;
+                word-break: break-all;
+                
+            }
+
+            th {
+                font-weight: $font-weight-3;
+                padding-left: 15px;
+                border-right: 1px solid $color-gray-5;
+                max-width: 200px;
+                overflow: hidden;
+
+            }
+
+            th:not(first-of-type) {
+                text-align: center
+            }
+        }
+    }
+
+}
+
+.table-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+    width: 90%;
+    margin: 0 auto 10px auto;
+    .filter-btn {
+      padding: 8px 14px;
+      background: $color-gray-2;
+      color: $black;
+      border: none;
+      border-radius: $border-radius-2;
+      font-size: $font-size-3;
+      cursor: pointer;
+      &:hover {
+        background: $color-gray-4;
+      }
+    }
+  }
+  
+  .header-cell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  
+    .column-filter-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: $font-size-3;
+      padding: 0 4px;
+      &:hover { color: $color-2; }
+    }
+  }
+  
+  .export-all-container {
+    display: flex;
+    justify-content: flex-end;
+    width: 90%;
+    margin: auto 10px;
+  
+    .export-all-btn {
+      padding: 8px 14px;
+      background-color: $color-2;
+      color: $white;
+      border: none;
+      border-radius: $border-radius-2;
+      font-size: $font-size-3;
+      cursor: pointer;
+      &:hover { background-color: $color-2-lighten-2; }
+    }
+
+  .sort-options {
+    margin-left: 16px;
+    display: flex;
+    align-items: center;
+
+    label {
+      margin-right: 6px;
+      font-size: $font-size-3;
+      color: $color-gray-8;
+    }
+    select {
+      padding: 6px 8px;
+      font-size: $font-size-3;
+      border: 1px solid $color-gray-5;
+      border-radius: $border-radius-2;
+      cursor: pointer;
+      background: $white;
+    }
+  }
+
+  .selectedColumn {
+    color: $color-2 !important;
+    font-weight: bold;
+    background: #f5f9ff;
+  }
+
+}
+
+.sort-indicator {
+  width: 90%;
+  margin: 8px 0;
+  font-size: 1em;
+  color: $color-gray-8;
+}
+
+
+/* ensure the wrapper lays out viewport + sidebar side by side */
+.table-scroll-wrapper {
+  display: flex;
+  width: 100%;
+  height: calc(100vh - 250px);  // or whatever your viewport height was
+}
+
+/* let the viewport grow to fill available space */
+.viewport {
+  flex: 1;
+}
+
+/* style the A–Z sidebar */
+.alpha-index {
+  width: 30px;
+  margin-left: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  button {
+    background: transparent;
+    border: none;
+    padding: 2px 0;
+    font-size: 0.8em;
+    cursor: pointer;
+    color: $color-gray-6;
+
+    &:hover {
+      color: $color-2;
+    }
+    &.active {
+      color: $color-2;
+      font-weight: bold;
+    }
+  }
+}
+
+/* strip every possible border/shadow/outline from the sort buttons */
+button.column-sort-btn,
+button.column-sort-btn:focus,
+button.column-sort-btn:hover {
+  /* kill the browser’s default button chrome */
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+
+  /* remove any background or border */
+  background: none !important;
+  border: none     !important;
+
+  /* remove any shadow/focus glow */
+  box-shadow: none !important;
+  outline: none    !important;
+}
+
+
+.sort-indicator {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin: 8px 0 0 0;   
+  padding-right: 50px; /* added so that the total document counter is moved to the left */     
+  color: $color-gray-8;      
+  border: none;              
+}
+
+"
