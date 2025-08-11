@@ -1,48 +1,50 @@
-  exportAll() {
-    // 1) Source headers (keys) and data
-    const headers = this.headersArray as string[];
-    const rows = this.allDataArray; // or this.dataArray
+/**
+ * Function for export all
+ */
+exportAll() {
+  // 1. Get headers (transform to match table display)
+  const headers = this.headersArray.map(h =>
+    h.replace(/_/g, ' ')                      // underscores → spaces
+     .replace(/\b\w/g, c => c.toUpperCase())   // capitalise each word
+  );
 
-    // 2) Build display headers exactly as table shows (via the same pipe)
-    const displayHeaders = headers.map(h => this.headerPipe.transform(h));
+  const rows = this.allDataArray; // or this.dataArray
 
-    // 3) Convert to CSV
-    // Optional BOM for better Excel compatibility
-    let csvContent = '\uFEFF' + displayHeaders.join(",") + "\n";
+  // 2. Convert to CSV
+  let csvContent = '\uFEFF' + headers.join(",") + "\n"; // BOM for Excel UTF-8 compatibility
 
-    rows.forEach(row => {
-      const rowStr = headers.map(h => {
-        let cell = row[h];
+  rows.forEach(row => {
+    const rowStr = this.headersArray.map(h => {
+      let cell = row[h];
 
-        // Normalize undefined/null
-        if (cell === undefined || cell === null) cell = '';
+      // Handle null/undefined
+      if (cell === undefined || cell === null) cell = '';
 
-        // Handle objects/arrays safely
-        if (typeof cell === 'object') {
-          cell = JSON.stringify(cell);
-        }
+      // Handle objects/arrays
+      if (typeof cell === 'object') {
+        cell = JSON.stringify(cell);
+      }
 
-        const s = String(cell);
-        // Quote if needed (commas, quotes, newlines)
-        if (/[",\n\r]/.test(s)) {
-          return `"${s.replace(/"/g, '""')}"`;
-        }
-        return s;
-      }).join(",");
+      const s = String(cell);
+      // Quote if needed
+      if (/[",\n\r]/.test(s)) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    }).join(",");
 
-      csvContent += rowStr + "\n";
-    });
+    csvContent += rowStr + "\n";
+  });
 
-    // 4) Trigger download
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
+  // 3. Trigger download
+  const blob = new Blob([csvContent], { type: "text/csv" });
+  const url = window.URL.createObjectURL(blob);
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "documents_export.csv";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-  }
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "documents_export.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
 }
