@@ -1,20 +1,18 @@
 exportAll() {
-  // 1. Format headers: replace underscores with spaces & capitalize each word
-  const headers = this.headersArray.map(h =>
-    h
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ')
-  );
-
-  const rows = this.allDataArray; // or this.dataArray
+  // 1. Use the visible column names from the table
+  const headers = this.headersArray; 
+  const rows = this.allDataArray; 
 
   // 2. Convert to CSV
   let csvContent = headers.join(",") + "\n";
   rows.forEach(row => {
     const rowStr = this.headersArray.map(h => {
-      // Quote strings with commas or quotes
-      const cell = row[h] !== undefined && row[h] !== null ? row[h] : '';
+      // Find the actual key in the object that matches this header if needed
+      const key = Object.keys(row).find(k => 
+        k.replace(/_/g, ' ').toLowerCase() === h.toLowerCase()
+      ) || h;
+
+      const cell = row[key] !== undefined && row[key] !== null ? row[key] : '';
       if (typeof cell === 'string' && (cell.includes(',') || cell.includes('"'))) {
         return `"${cell.replace(/"/g, '""')}"`;
       }
