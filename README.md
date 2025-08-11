@@ -1,33 +1,35 @@
 exportAll() {
-  const headers = this.headersArray;            // ['document_name','file_name','fiscal_year','link','last_updated']
-  const rows = this.allDataArray;               // or this.dataArray
+  // Keys coming from the table, in the order you want
+  const keys: string[] = this.headersArray;
 
-  // 1) Build human-readable header labels (keep 'link' lowercase)
-  const headerLabels = headers.map(h =>
-    h === 'link'
-      ? 'link'
-      : h
-          .replace(/[_-]/g, ' ')                // underscores/hyphens -> spaces
-          .replace(/\b\w/g, m => m.toUpperCase()) // Title Case
-  );
+  // Exact labels you want in the CSV header row
+  const keyToLabel: Record<string, string> = {
+    document_name: 'Document Name',
+    file_name: 'File Name',
+    'file-name': 'File Name',     // just in case
+    fiscal_year: 'Fiscal Year',
+    'fiscal-year': 'Fiscal Year', // just in case
+    link: 'link',
+    last_updated: 'Last Updated',
+    'last-updated': 'Last Updated'// just in case
+  };
 
-  // 2) Start CSV with the pretty headers
+  const headerLabels = keys.map(k => keyToLabel[k] ?? k);
+
+  const rows = this.allDataArray ?? [];
+
   let csvContent = headerLabels.join(",") + "\n";
 
-  // 3) Append rows using the original keys
-  rows.forEach(row => {
-    const rowStr = headers.map(h => {
-      const cell = row[h] ?? '';
-      // Quote if it contains comma, quote, or newline; escape quotes
-      if (typeof cell === 'string' && /[",\n\r]/.test(cell)) {
-        return `"${cell.replace(/"/g, '""')}"`;
-      }
-      return cell;
+  rows.forEach((row: any) => {
+    const line = keys.map(k => {
+      const cell = row?.[k] ?? '';
+      const s = String(cell);
+      // Quote if comma, quote, or newline; escape quotes
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     }).join(",");
-    csvContent += rowStr + "\n";
+    csvContent += line + "\n";
   });
 
-  // 4) Download
   const blob = new Blob([csvContent], { type: "text/csv" });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
