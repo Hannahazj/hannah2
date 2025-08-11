@@ -1,101 +1,94 @@
-def generate_function_code(raw_label: str, fallback_name: str = "") -> str:
-    """
-    Generate a single Python function.
-    - raw_label: original node label, may contain "?"
-      * left of "?" becomes docstring
-      * right of "?" becomes function name
-    - fallback_name: used if raw_label has no "?" (already cleaned)
-    """
-    raw = (raw_label or "").strip()
-    if "?" in raw:
-        doc_part, name_part = raw.split("?", 1)
-        doc_part  = doc_part.strip()
-        name_part = name_part.strip()
-    else:
-        # No "?" present → doc from raw, name from fallback/raw
-        doc_part  = raw
-        name_part = fallback_name or raw
+async function exportJson() {
+  const zip = new JSZip();
 
-    clean_name = to_snake_case(name_part) or "unnamed_function"
-    clean_doc  = clean_string(doc_part) or clean_name
+  // 1) Top-level Python folder
+  const pyFolder = zip.folder("Python");
 
-    return (
-        f"def {clean_name}(mr) -> (bool, dict):\n"
-        f'    """{clean_doc}"""\n'
-        f'    print("{clean_name} called.")\n'
-        f"    return True, {{}}\n\n"
-    )
+  // 1a) Include framework.py once at the root of Python/
+  try {
+    const respF = await fetch('/Python_Files/framework.py');
+    const frameworkCode = await respF.text();
+    pyFolder.file("framework.py", frameworkCode);
+  } catch (e) {
+    console.warn("framework.py fetch failed; continuing without it.", e);
+    pyFolder.file("framework.py", ""); // keep structure predictable
+  }
 
+  // 2) Iterate each visual pane
+  for (let idx = 0; idx < networkPanes.length; idx++) {
+    const pane = networkPanes[idx];
 
-def generate_board_files(board_name: str, functions: Dict[str, str], paths: List) -> Dict[str, str]:
-    """
-    Generate all files for a single board.
+    // 2a) Pane name from tab text → sanitized
+    const tab = document.querySelector(`.tab[data-index="${idx}"]`);
+    let paneName = (tab && tab.textContent.trim()) || `pane${idx + 1}`;
+    paneName = paneName.replace(/\W+/g, '_').replace(/^(\d)/, '_$1');
 
-    functions: dict mapping { clean_func_key: raw_label_with_possible_question_mark }
-               (Values come from get_paths → graph.nodes[node_id]['raw_label'])
-    """
-    snake_name = to_snake_case(board_name)
-    pascal_name = to_pascal_case(board_name)
+    // 2b) Create pane folder
+    const thisPaneFolder = pyFolder.folder(paneName);
 
-    # Build consistent display→callable mapping by parsing each raw label.
-    # - display name (key in Board.functions) = left of '?', cleaned
-    # - callable name (import + value)        = right of '?', snake_cased
-    function_map: Dict[str, str] = {}   # callable_name -> display_name
-    for clean_key, raw in functions.items():
-        raw = (raw or "").strip()
-        if "?" in raw:
-            left, right = raw.split("?", 1)
-            display = clean_string(left.strip()) or clean_string(right.strip()) or clean_key
-            callable_name = to_snake_case(right.strip()) or to_snake_case(clean_key) or "unnamed_function"
-        else:
-            # No "?" — fall back to the cleaned key for the name; doc/display from raw
-            display = clean_string(raw) or clean_key
-            callable_name = to_snake_case(clean_key) or "unnamed_function"
+    // 2c) Dump graph JSON
+    const graph = getGraphJson(pane);
+    const jsonStr = JSON.stringify(graph, null, 2);
+    thisPaneFolder.file("json.canvas", jsonStr);
 
-        # keep first occurrence per callable
-        if callable_name not in function_map:
-            function_map[callable_name] = display
+    // 2d) Pane-level __init__.py
+    thisPaneFolder.file("__init__.py", "");
 
-    # ----- board.py -----
-    imports = ", ".join(sorted(function_map.keys())) or ""
-    board_content = (
-        '"""\nDISCLAIMER:\nThis python file was created automatically.\n"""\n\n'
-        f"from ...framework import Board\n"
-        f"from .functions import {imports}\n\n"
-        f"class {pascal_name}(Board):\n"
-        f"    functions = {{\n"
-        + ",\n".join([f'        "{display}": {callable_name}'
-                     for callable_name, display in function_map.items()])
-        + "\n    }\n\n"
-        f"    paths = {json.dumps(paths, indent=8)}\n"
-    )
-
-    # ----- functions.py -----
-    functions_content = '"""\nDISCLAIMER:\nThis python file was created automatically.\n"""\n\n'
-    seen = set()
-    for clean_key, raw in functions.items():
-        # derive the callable name exactly the same way
-        if "?" in (raw or ""):
-            _, right = raw.split("?", 1)
-            callable_name = to_snake_case(right.strip()) or to_snake_case(clean_key) or "unnamed_function"
-        else:
-            callable_name = to_snake_case(clean_key) or "unnamed_function"
-
-        if callable_name in seen:
-            continue
-        # Generate using the RAW label for split + a fallback for safety
-        functions_content += generate_function_code(raw, fallback_name=clean_key)
-        seen.add(callable_name)
-
-    # ----- __init__.py -----
-    init_content = (
-        '"""\nPackage initialization.\n"""\n\n'
-        f"from .board import {pascal_name}\n"
-        f"__all__ = ['{pascal_name}']\n"
-    )
-
-    return {
-        f"Board_{snake_name}/board.py": board_content,
-        f"Board_{snake_name}/functions.py": functions_content,
-        f"Board_{snake_name}/__init__.py": init_content
+    // 2e) Ask backend to generate code for this pane
+    let dataWF = {};
+    try {
+      const respWF = await fetch('/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ json: graph, flowName: paneName })
+      });
+      dataWF = await respWF.json();
+    } catch (e) {
+      console.error("Code generation failed for pane:", paneName, e);
+      dataWF = {};
     }
+
+    // 2f) Write workflow.py if present
+    const workflowCode = dataWF['workflow.py'] || "";
+    thisPaneFolder.file("workflow.py", workflowCode);
+
+    // 2g) MULTI-BOARD OUTPUT: create one folder per returned Board_*
+    const boardKeys = Object.keys(dataWF).filter(k => k.startsWith('Board_'));
+
+    // group by folder prefix, e.g. "Board_sales" => ["Board_sales/board.py", ...]
+    const byFolder = {};
+    for (const key of boardKeys) {
+      const slash = key.indexOf('/');
+      if (slash === -1) continue; // safety
+      const folder = key.slice(0, slash); // e.g. "Board_sales"
+      (byFolder[folder] ||= []).push(key);
+    }
+
+    // write each board's files into its own subfolder
+    for (const folder of Object.keys(byFolder)) {
+      const out = thisPaneFolder.folder(folder);
+
+      // standard files; ensure __init__.py exists
+      out.file("__init__.py", dataWF[`${folder}/__init__.py`] || "");
+      if (dataWF[`${folder}/board.py`]) {
+        out.file("board.py", dataWF[`${folder}/board.py`]);
+      }
+      if (dataWF[`${folder}/functions.py`]) {
+        out.file("functions.py", dataWF[`${folder}/functions.py`]);
+      }
+
+      // future-proof: write any extras returned under that board folder
+      for (const key of byFolder[folder]) {
+        const name = key.slice(folder.length + 1); // strip "Board_xxx/"
+        if (!["board.py", "functions.py", "__init__.py"].includes(name)) {
+          out.file(name, dataWF[key]);
+        }
+      }
+    }
+  }
+
+  // 3) Zip it up and download
+  const blob = await zip.generateAsync({ type: "blob" });
+  const filename = (projectName || "exported_graphs_and_code") + ".zip";
+  saveAs(blob, filename);
+}
