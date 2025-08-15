@@ -1,117 +1,63 @@
-def derive_callable_name(raw_label: str, fallback: str) -> str:
-    """
-    Canonical callable name:
-      - if raw has '?', use right side
-      - else use fallback (or raw)
-    Then snake_case it.
-    """
-    raw = (raw_label or "").strip()
-    if "?" in raw:
-        _, right = raw.split("?", 1)
-        base = right.strip()
-    else:
-        base = fallback or raw
-    return to_snake_case(base) or "unnamed_function"
+# pip install pypdf
+from pypdf import PdfReader
+
+def read_with_pypdf(path: str, password: str | None = None):
+    reader = PdfReader(path)
+    if reader.is_encrypted and password:
+        # If the PDF is encrypted, try to decrypt
+        reader.decrypt(password)
+
+    print(f"Pages: {len(reader.pages)}")
+    if reader.metadata:
+        print("Metadata:")
+        for k, v in reader.metadata.items():
+            print(f"  {k}: {v}")
+
+    page_texts = []
+    for i, page in enumerate(reader.pages, start=1):
+        text = page.extract_text() or ""
+        page_texts.append(text)
+        print(f"\n--- Page {i} ---\n{text[:500]}")  # preview first 500 chars
+
+    return page_texts
+
+if __name__ == "__main__":
+    read_with_pypdf("your_file.pdf", password=None)
 
 
-def derive_display_name(raw_label: str, fallback: str) -> str:
-    """
-    Human display name for Board.functions:
-      - if raw has '?', use cleaned left side (fallback to right)
-      - else use cleaned raw
-    """
-    raw = (raw_label or "").strip()
-    if "?" in raw:
-        left, right = raw.split("?", 1)
-        disp = clean_string(left.strip()) or clean_string(right.strip()) or fallback
-    else:
-        disp = clean_string(raw) or fallback
-    return disp
+# pip install pdfplumber
+import csv
+import pdfplumber
 
-def get_paths(canvas_data: Dict, graph: nx.DiGraph) -> Dict:
-    """
-    Build per-root (board) paths and function registry.
-    KEYS in 'functions' and in 'paths.trigger'/'paths.action' are the
-    FINAL callable names (match 'from .functions import <name>').
-    VALUES in 'functions' keep the RAW label (may include '?') for docs.
-    """
-    nodes = canvas_data.get("nodes", [])
-    elements = get_elements_from_canvas(nodes)
-    roots: Dict[str, Dict[str, Any]] = {}
+def read_with_pdfplumber(path: str, password: str | None = None, export_tables_csv: str | None = None):
+    page_texts = []
+    all_tables = []  # list of (page_number, table_rows)
 
-    # Identify root nodes (in-degree 0) and associate to nearest element (Board/Composite)
-    for node in nodes:
-      node_id = node.get("id")
-      if node_id not in graph:
-          continue
-      if graph.in_degree(node_id) == 0:
-          closest_element = find_closest_node(node, elements)
-          if closest_element:
-              roots[node_id] = {
-                  "label": clean_string(closest_element.get("label", "")),
-                  "type": closest_element.get("elem_type", "Unknown"),
-                  "paths": [],
-                  "functions": {}  # { callable_name: raw_label }
-              }
-          else:
-              roots[node_id] = {
-                  "label": clean_string(node.get("label", "")),
-                  "type": "Unknown",
-                  "paths": [],
-                  "functions": {}
-              }
+    with pdfplumber.open(path, password=password) as pdf:
+        print(f"Pages: {len(pdf.pages)}")
 
-    # For each root, enumerate unique paths to leaves
-    for root_id, root_info in roots.items():
-        if root_id not in graph:
-            continue
+        for i, page in enumerate(pdf.pages, start=1):
+            # Text
+            text = page.extract_text() or ""
+            page_texts.append(text)
+            print(f"\n--- Page {i} ---\n{text[:500]}")  # preview
 
-        leaf_nodes = [n for n in graph.nodes() if graph.out_degree(n) == 0]
-        seen_path_keys = set()
+            # Tables (works best on text-based, ruled tables)
+            tables = page.extract_tables()
+            if tables:
+                for t in tables:
+                    all_tables.append((i, t))
 
-        for leaf in leaf_nodes:
-            if leaf not in graph:
-                continue
+    # Optional: export all detected tables to one CSV (with page separators)
+    if export_tables_csv and all_tables:
+        with open(export_tables_csv, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            for page_no, rows in all_tables:
+                writer.writerow([f"__PAGE_{page_no}__"])
+                writer.writerows(rows)
+        print(f"\nTables exported to: {export_tables_csv}")
 
-            for path in nx.all_simple_paths(graph, source=root_id, target=leaf):
-                callable_seq: List[str] = []
-                triggers: List[str] = []
-                node_ids: List[str] = []
+    return page_texts, all_tables
 
-                for i, node_id in enumerate(path):
-                    # RAW label first (may include '?')
-                    raw_label = graph.nodes[node_id].get("raw_label") or graph.nodes[node_id].get("label", "")
-                    # Fallback name source if needed
-                    fallback = graph.nodes[node_id].get("label", "") or f"node_{node_id}"
-                    # 🔑 Canonical callable for this node
-                    callable_name = derive_callable_name(raw_label, fallback)
-                    callable_seq.append(callable_name)
-                    node_ids.append(node_id)
-
-                    if i < len(path) - 1:
-                        edge_data = graph.get_edge_data(node_id, path[i + 1]) or {}
-                        triggers.append(clean_string(edge_data.get("label", "")))
-
-                if not callable_seq:
-                    continue
-
-                # Dedupe by exact node-id sequence + triggers
-                key = (tuple(node_ids), tuple(triggers))
-                if key in seen_path_keys:
-                    continue
-                seen_path_keys.add(key)
-
-                # Record the path (keys are callable names)
-                root_info["paths"].append({
-                    "trigger": dict(zip(callable_seq, triggers)),
-                    "action": callable_seq[-1]
-                })
-
-                # Register intermediate functions under their callable names with RAW labels
-                for idx, cname in enumerate(callable_seq[:-1]):
-                    nid = node_ids[idx]
-                    raw_for_func = graph.nodes[nid].get("raw_label") or graph.nodes[nid].get("label", "")
-                    # Dict ensures de-dupe by callable name; first one wins
-                    root_info["functions"].setdefault(cname, raw_for_func)
-
-    return roots
+if __name__ == "__main__":
+    read_with_pdfplumber("your_file.pdf", password=None, export_tables_csv="tables.csv")
